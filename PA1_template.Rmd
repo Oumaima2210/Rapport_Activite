@@ -1,0 +1,97 @@
+---
+title: "Analyse de l’activité"
+author: "Oumaima Bouchiba"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(rmarkdown)
+```
+
+## **🔹 Charger les données**
+```{r load_data}
+activity_data <- read.csv("/Users/bekkaryounes/Downloads/activity.csv", stringsAsFactors = FALSE)
+
+# Vérifier les premières lignes
+head(activity_data)
+
+# Vérifier la structure
+str(activity_data)
+
+# Convertir la colonne date
+activity_data$date <- as.Date(activity_data$date, format="%Y-%m-%d")
+```
+
+## **🔹 Analyser les valeurs manquantes**
+```{r missing_values}
+sum(is.na(activity_data$steps))
+```
+
+## **🔹 Nombre total de pas par jour**
+```{r total_steps_per_day}
+daily_steps <- activity_data %>%
+  group_by(date) %>%
+  summarise(total_steps = sum(steps, na.rm = TRUE))
+
+# Histogramme
+ggplot(daily_steps, aes(x = total_steps)) +
+  geom_histogram(binwidth = 1000, fill = "blue", color = "black") +
+  labs(title = "Répartition des pas quotidiens",
+       x = "Nombre total de pas par jour",
+       y = "Fréquence") +
+  theme_minimal()
+```
+
+## **🔹 Moyenne et médiane des pas quotidiens**
+```{r mean_median}
+mean_steps <- mean(daily_steps$total_steps, na.rm = TRUE)
+median_steps <- median(daily_steps$total_steps, na.rm = TRUE)
+mean_steps
+median_steps
+```
+
+## **🔹 Analyse des intervalles de 5 minutes**
+```{r interval_analysis}
+interval_avg <- activity_data %>%
+  group_by(interval) %>%
+  summarise(avg_steps = mean(steps, na.rm = TRUE))
+
+# Série temporelle
+ggplot(interval_avg, aes(x = interval, y = avg_steps)) +
+  geom_line(color = "blue", linewidth = 1) +
+  labs(title = "Moyenne des pas par intervalle de 5 minutes",
+       x = "Intervalle de 5 minutes",
+       y = "Nombre moyen de pas") +
+  theme_minimal()
+```
+
+## **🔹 Imputation des valeurs manquantes**
+```{r imputation}
+activity_data_imputed <- activity_data %>%
+  left_join(interval_avg, by = "interval") %>%
+  mutate(steps = ifelse(is.na(steps), avg_steps, steps)) %>%
+  select(-avg_steps)
+
+# Vérification
+sum(is.na(activity_data_imputed$steps))
+```
+
+## **🔹 Comparaison semaine vs week-end**
+```{r weekday_vs_weekend}
+activity_data_imputed$jour_type <- ifelse(weekdays(activity_data_imputed$date) %in% c("Saturday", "Sunday"), "weekend", "weekday")
+
+interval_weekly <- activity_data_imputed %>%
+  group_by(interval, jour_type) %>%
+  summarise(avg_steps = mean(steps), .groups = 'drop')
+
+# Graphique comparatif
+ggplot(interval_weekly, aes(x = interval, y = avg_steps, color = jour_type)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Comparaison de l'activité : semaine vs week-end",
+       x = "Intervalle de 5 minutes",
+       y = "Nombre moyen de pas") +
+  theme_minimal()
+```
